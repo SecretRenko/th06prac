@@ -1,0 +1,12 @@
+{
+  "targetSha256": "07850C8C6E469C0E82C13423E6D0D096A88D693455BDACACBB44C0AA3BCCE473",
+  "bossEntrances": [
+    { "stage": 1, "bossName": "露米娅", "eventFrame": 5092, "verification": "Normal 灵梦 A 登场；Hard 魔理沙 B 战斗及重开已实测" },
+    { "stage": 2, "bossName": "琪露诺", "eventFrame": 5893, "verification": "Normal 灵梦 A：登场对话已实测" },
+    { "stage": 3, "bossName": "红美铃", "eventFrame": 6254, "verification": "Normal 灵梦 A：用户确认对话后正常" },
+    { "stage": 4, "bossName": "帕秋莉", "eventFrame": 10510, "verification": "Normal 灵梦 A：用户反馈正常" },
+    { "stage": 5, "bossName": "十六夜咲夜", "eventFrame": 7604, "verification": "Normal 灵梦 A：用户反馈正常" },
+    { "stage": 6, "bossName": "蕾米莉亚", "eventFrame": 3096, "verification": "Normal 灵梦 A：登场对话及重开已实测" },
+    { "stage": 7, "bossName": "芙兰朵露", "eventFrame": 8493, "verification": "脚本推定，未实测；Extra 入口尚未解锁" }
+  ]
+}

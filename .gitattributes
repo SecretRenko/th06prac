@@ -1,0 +1,4 @@
+# Windows 上要直接执行的文件，强制 CRLF
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf

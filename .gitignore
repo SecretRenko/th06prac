@@ -1,0 +1,25 @@
+# 构建 / 工具缓存
+/.appdata/
+/.dotnet/
+/.nuget/
+/.vs/
+/dist/
+/dist-ui/
+/dist-ui-next/
+/release/
+/backups/
+/isolated-game/
+/references/
+/investigation/extracted-ecl/
+**/investigation/snapshots/
+**/bin/
+**/obj/
+__pycache__/
+
+# 绝不入库：复制的游戏文件与提取出的资源
+*.dat
+*.ecl
+*.anm
+*.rpy
+score.dat
+th06nc.exe
