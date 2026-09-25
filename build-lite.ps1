@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 # Build the Lite distribution package: no .NET runtime bundled, target machine
 # must have the .NET 10 Desktop Runtime (x64) installed.
-# Output: release\XinDianPrac-Lite-<stamp>\ and release\XinDianPrac-Lite-<stamp>.zip
+# Output: release\th06ncprac-Lite-<stamp>\ and release\th06ncprac-Lite-<stamp>.zip
 #
 # NOTE: keep this file ASCII-only. Windows PowerShell 5.1 reads BOM-less files as
 # ANSI, so non-ASCII characters here can silently swallow the next line.
@@ -17,7 +17,7 @@ $gui = Join-Path $workspace 'src\XinDianPrac.Gui\XinDianPrac.Gui.csproj'
 $config = Join-Path $workspace 'NuGet.Config'
 $release = Join-Path $workspace 'release'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$packageName = "XinDianPrac-Lite-$stamp"
+$packageName = "th06ncprac-Lite-$stamp"
 $package = Join-Path $release $packageName
 
 New-Item -ItemType Directory -Path $release -Force | Out-Null

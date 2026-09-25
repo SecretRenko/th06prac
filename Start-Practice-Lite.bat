@@ -1,6 +1,6 @@
 @echo off
 setlocal
-rem XinDianPrac Lite - no bundled .NET runtime; needs .NET 10 Desktop Runtime (x64).
+rem th06ncprac Lite - no bundled .NET runtime; needs .NET 10 Desktop Runtime (x64).
 set "APP=%~dp0dist-ui\XinDianPrac.Gui.dll"
 if not exist "%APP%" (
   echo [ERROR] Missing dist-ui\XinDianPrac.Gui.dll
@@ -13,7 +13,7 @@ set "DOTNET="
 for /f "delims=" %%I in ('where dotnet.exe 2^>nul') do if not defined DOTNET set "DOTNET=%%I"
 if not defined DOTNET goto nodotnet
 :run
-start "XinDianPrac" "%DOTNET%" "%APP%"
+start "th06ncprac" "%DOTNET%" "%APP%"
 exit /b 0
 :nodotnet
 echo [ERROR] dotnet.exe not found.

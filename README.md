@@ -1,4 +1,4 @@
-# th06prac
+# th06ncprac
 
 一个用于《东方红魔乡：新典》（Touhou Koumakyou: New Classic）的简易练习辅助工具。
 

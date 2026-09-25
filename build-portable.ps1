@@ -11,7 +11,7 @@ $gui = Join-Path $workspace 'src\XinDianPrac.Gui\XinDianPrac.Gui.csproj'
 $config = Join-Path $workspace 'NuGet.Config'
 $release = Join-Path $workspace 'release'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$packageName = "XinDianPrac-Portable-$stamp"
+$packageName = "th06ncprac-Portable-$stamp"
 $package = Join-Path $release $packageName
 
 New-Item -ItemType Directory -Path $release -Force | Out-Null
@@ -61,6 +61,8 @@ foreach ($notice in @('LICENSE.txt', 'ThirdPartyNotices.txt')) {
 }
 
 $archive = Join-Path $release "$packageName.zip"
-Compress-Archive -Path (Join-Path $package '*') -DestinationPath $archive -CompressionLevel Optimal
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::CreateFromDirectory($package, $archive,
+    [System.IO.Compression.CompressionLevel]::Optimal, $false)
 Write-Host "Portable folder: $package"
 Write-Host "Portable archive: $archive"

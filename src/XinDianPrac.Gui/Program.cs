@@ -239,7 +239,7 @@ internal sealed class MainForm : Form
         }
         menuReturnSince = default;
         if (readyMenuSince == default) readyMenuSince = DateTime.UtcNow;
-        if (DateTime.UtcNow - readyMenuSince < TimeSpan.FromMilliseconds(750)) return;
+        if (DateTime.UtcNow - readyMenuSince < TimeSpan.FromSeconds(2)) return;
         if (!practiceStageMenuSeen || readyPrompted || monitor is { HasExited: false } || commandBusy || mode != 1 || stageIndex != 0) return;
         var index = practiceSelectedStageIndex;
         if (index is < 0 or > 5) return;

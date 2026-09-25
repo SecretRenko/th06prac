@@ -1,9 +1,9 @@
-东方红魔乡：新典 离线练习控制器（便携版）
+th06ncprac · 东方红魔乡：新典 离线练习控制器（便携版）
 
 使用方法
-1. 将 XinDianPrac-Portable 文件夹放在游戏根目录内，与 th06nc.exe 所在目录相邻。例如：
+1. 将 th06ncprac-Portable 文件夹放在游戏根目录内，与 th06nc.exe 所在目录相邻。例如：
    游戏根目录\th06nc.exe
-   游戏根目录\XinDianPrac-Portable\Start-Practice.bat
+   游戏根目录\th06ncprac-Portable\Start-Practice.bat
 2. 双击 Start-Practice.bat。控制器会自动连接同目录的 th06nc.exe；若游戏已运行，也会尝试连接该进程。
 3. 若游戏放在其他目录，点击“选择游戏程序”并选择要连接的 th06nc.exe，再点击“启动/连接游戏”。
 4. 进入 Practice 关卡菜单后，按第一次 Z 显示开局设置；确认后按第二次 Z 开始。
