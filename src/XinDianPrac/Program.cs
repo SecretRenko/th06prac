@@ -279,7 +279,7 @@ internal static class Program
             int requestedStartStage = 0, requestedStartScore = 0, requestedStartBoss = 0;
             bool monitorStart = args.Length == 7 && args[0] == "monitor-start" &&
                 int.TryParse(args[1], out requestedStartStage) && requestedStartStage is >= 1 and <= 6 &&
-                int.TryParse(args[2], out requestedStartScore) && requestedStartScore is >= 0 and <= 999999990 && requestedStartScore % 10 == 0 &&
+                int.TryParse(args[2], out requestedStartScore) && requestedStartScore is >= 0 and <= 999999990 &&
                 int.TryParse(args[6], out requestedStartBoss) && requestedStartBoss is 0 or 1;
             bool monitorBossStage6 = args.Length == 4 && args[0] == "monitor-boss-stage6";
             int monitorBossStage = 0;

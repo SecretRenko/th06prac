@@ -22,7 +22,6 @@ $package = Join-Path $release $packageName
 
 New-Item -ItemType Directory -Path $release -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $package 'dist') -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $package 'dist-ui') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $package 'config') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $package 'dist\config') -Force | Out-Null
 
@@ -36,10 +35,11 @@ dotnet publish $core --no-restore -c Release -p:DebugType=None -p:DebugSymbols=f
 if ($LASTEXITCODE -ne 0) { throw 'Core publish failed.' }
 if (-not (Test-Path -LiteralPath (Join-Path $package 'dist\XinDianPrac.exe'))) { throw 'Core publish did not produce dist\XinDianPrac.exe' }
 
-# GUI is published without an apphost: saves 162 KB, the system dotnet.exe loads the dll.
-dotnet publish $gui --no-restore -c Release -p:UseAppHost=false -p:DebugType=None -p:DebugSymbols=false -o (Join-Path $package 'dist-ui')
+# Keep the Windows GUI apphost so direct launch does not open a console window.
+dotnet publish $gui --no-restore -c Release -p:UseAppHost=true -p:DebugType=None -p:DebugSymbols=false -o $package
 if ($LASTEXITCODE -ne 0) { throw 'UI publish failed.' }
-if (-not (Test-Path -LiteralPath (Join-Path $package 'dist-ui\XinDianPrac.Gui.dll'))) { throw 'UI publish did not produce dist-ui\XinDianPrac.Gui.dll' }
+if (-not (Test-Path -LiteralPath (Join-Path $package 'XinDianPrac.Gui.exe'))) { throw 'UI publish did not produce XinDianPrac.Gui.exe' }
+Move-Item -LiteralPath (Join-Path $package 'XinDianPrac.Gui.exe') -Destination (Join-Path $package 'th06ncprac.exe')
 
 Copy-Item -LiteralPath (Join-Path $workspace 'config\entrances.json') -Destination (Join-Path $package 'config\entrances.json')
 Copy-Item -LiteralPath (Join-Path $workspace 'config\entrances.json') -Destination (Join-Path $package 'dist\config\entrances.json')

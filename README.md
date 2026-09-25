@@ -28,10 +28,10 @@
 
 | 版本 | 体积 | 说明 |
 | --- | ---: | --- |
-| **Lite** | 约 0.24 MB | 需要自备 .NET 10 Desktop Runtime (x64) |
+| **Lite** | 小于 0.5 MB | 需要自备 .NET 10 Desktop Runtime (x64) |
 | **Portable** | 约 171 MB | 自带运行时，无需安装任何东西 |
 
-两种版本都解压到游戏根目录、与 `th06nc.exe` 相邻，双击 `Start-Practice.bat` 启动。
+两种版本都解压到游戏根目录、与 `th06nc.exe` 相邻。Lite 双击包内最外层的 `th06ncprac.exe` 启动；Portable 双击 `Start-Practice.bat` 启动。
 
 ## 使用
 

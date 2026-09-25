@@ -11,7 +11,8 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
-        var gamePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "th06nc.exe"));
+        var gamePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            File.Exists(Path.Combine(AppContext.BaseDirectory, "config", "entrances.json")) ? ".." : "..\\..", "th06nc.exe"));
         var identity = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(gamePath.ToUpperInvariant())));
         using var singleInstance = new Mutex(true, $@"Local\XinDianPrac-{identity}", out var firstInstance);
         if (!firstInstance)
@@ -239,7 +240,7 @@ internal sealed class MainForm : Form
         }
         menuReturnSince = default;
         if (readyMenuSince == default) readyMenuSince = DateTime.UtcNow;
-        if (DateTime.UtcNow - readyMenuSince < TimeSpan.FromSeconds(2)) return;
+        if (DateTime.UtcNow - readyMenuSince < TimeSpan.FromMilliseconds(750)) return;
         if (!practiceStageMenuSeen || readyPrompted || monitor is { HasExited: false } || commandBusy || mode != 1 || stageIndex != 0) return;
         var index = practiceSelectedStageIndex;
         if (index is < 0 or > 5) return;
