@@ -257,8 +257,13 @@ internal sealed class MainForm : Form
             StartMonitoring(selected);
             return;
         }
-        if (mode == 1 && menu == 9 && stageIndex == 0)
+        // Returning from a stage can leave stageIndex at the previous stage
+        // until the first ready screen is cancelled; menu 9 is the selector.
+        if (mode == 1 && menu == 9)
         {
+            // The previous practice session has ended. Its monitor must not
+            // suppress the first confirmation dialog of the next session.
+            if (monitor is { HasExited: false }) StopMonitoring();
             practiceStageMenuSeen = true;
             practiceStageMenuSeenAt = DateTime.UtcNow;
             if (cursor is >= 0 and <= 5) practiceSelectedStageIndex = cursor;
@@ -288,7 +293,7 @@ internal sealed class MainForm : Form
         menuReturnSince = default;
         if (readyMenuSince == default) readyMenuSince = DateTime.UtcNow;
         if (DateTime.UtcNow - readyMenuSince < TimeSpan.FromMilliseconds(750)) return;
-        if (!practiceStageMenuSeen || readyPrompted || monitor is { HasExited: false } || commandBusy || mode != 1 || stageIndex != 0) return;
+        if (!practiceStageMenuSeen || readyPrompted || monitor is { HasExited: false } || commandBusy || mode != 1) return;
         var index = practiceSelectedStageIndex;
         if (index is < 0 or > 5) return;
         readyPrompted = true;
