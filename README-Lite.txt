@@ -25,8 +25,8 @@ th06ncprac · 东方红魔乡：新典 离线练习控制器 · 轻量版（Lite
 - config\    entrances.json（Boss 入口表）、settings.json（开局默认值）、game-target.json（游戏路径）
 - config\ 和 dist\config\ 都要保留：核心按自身目录读取 dist\config\entrances.json。
 
-版本要求
-只支持 SHA-256 为 07850C8C6E469C0E82C13423E6D0D096A88D693455BDACACBB44C0AA3BCCE473 的 th06nc.exe（与完整版一致）。
+版本兼容性
+控制器不按 SHA-256 拒绝游戏版本。目前识别已研究的旧版与 Steam 版两种内存布局；遇到未知布局会停止连接，避免向未经定位的地址写入。Steam 版已由用户确认开局弹窗、Boss 跳转及 R 重开后资源保持正常；其他组合尚未逐一实测。
 
 界面
 已包含 2026-09-26 的界面修改：黑白灰 + 浅蓝配色、大标题容器加高、「打开日志目录」按钮不再被裁。

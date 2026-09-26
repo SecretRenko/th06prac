@@ -2,13 +2,13 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace XinDianPrac;
 
 internal static class Program
 {
-    private const string ExpectedHash = "07850C8C6E469C0E82C13423E6D0D096A88D693455BDACACBB44C0AA3BCCE473";
     // 发行包布局：<游戏根>\XinDianPrac-*\dist\XinDianPrac.exe → <游戏根>\th06nc.exe
     // 开发布局：  <工作目录>\dist\XinDianPrac.exe             → <工作目录>\isolated-game\th06nc.exe
     private static string ResolveGamePath(bool isolated)
@@ -23,37 +23,88 @@ internal static class Program
     }
     private static class Address
     {
-        internal const int Lives = 0x4FF0F0;
-        internal const int Bombs = 0x4FF0F1;
-        internal const int Power = 0x4F1E88;
-        internal const int ScoreCandidate = 0x4F2790;
-        internal const int Stage = 0x4F1E84;
-        internal const int Difficulty = 0x4F27C0;
-        internal const int Character = 0x4F1E80;
-        internal const int Shot = 0x4F1E81;
-        internal const int Practice = 0x4F27B4;
-        internal const int PracticeB5 = 0x4F27B5;
-        internal const int PracticeC4 = 0x4F27C4;
-        internal const int Mode = 0xC21D9C;
-        internal const int DefaultLives = 0xC21DB4;
-        internal const int DefaultBombs = 0xC21DB5;
-        internal const int C21DBB = 0xC21DBB;
-        internal const int PracticeUnlockBase = 0x4FF105;
-        internal const int TimelinePrevious = 0xBADF48;
-        internal const int TimelineCurrent = 0xBADF4C;
+        internal static int Lives { get; private set; } = 0x4FF0F0;
+        internal static int Bombs { get; private set; } = 0x4FF0F1;
+        internal static int Power { get; private set; } = 0x4F1E88;
+        internal static int ScoreCandidate { get; private set; } = 0x4F2790;
+        internal static int Stage { get; private set; } = 0x4F1E84;
+        internal static int Difficulty { get; private set; } = 0x4F27C0;
+        internal static int Character { get; private set; } = 0x4F1E80;
+        internal static int Shot { get; private set; } = 0x4F1E81;
+        internal static int Practice { get; private set; } = 0x4F27B4;
+        internal static int PracticeB5 { get; private set; } = 0x4F27B5;
+        internal static int PracticeC4 { get; private set; } = 0x4F27C4;
+        internal static int Mode { get; private set; } = 0xC21D9C;
+        internal static int Menu { get; private set; } = 0x50A0D0;
+        internal static int Cursor { get; private set; } = 0xC07268;
+        internal static int DefaultLives { get; private set; } = 0xC21DB4;
+        internal static int DefaultBombs { get; private set; } = 0xC21DB5;
+        internal static int C21DBB { get; private set; } = 0xC21DBB;
+        internal static int PracticeUnlockBase { get; private set; } = 0x4FF105;
+        internal static int TimelinePrevious { get; private set; } = 0xBADF48;
+        internal static int TimelineCurrent { get; private set; } = 0xBADF4C;
         internal const int Data = 0x323000;
-        internal const int MemoryDataSize = 0x906660;
+        internal static int MemoryDataSize { get; private set; } = 0x906660;
+
+        internal static string Configure(int dataRva, int dataSize)
+        {
+            if (dataRva == Data && dataSize == 0x906660) return "旧版布局";
+            if (dataRva != 0x36D000 || dataSize != 0x908884)
+                throw new InvalidOperationException($"尚未定位此游戏的内存布局（.data RVA=0x{dataRva:X}，大小=0x{dataSize:X}），拒绝写入。");
+
+            // Offsets within .data were matched against the old and Steam builds,
+            // then checked in Steam's menu, ready screen and paused Stage 1.
+            const int gameplayDelta = 0xC50;
+            const int menuDelta = 0xFA0;
+            const int runtimeDelta = 0x2220;
+            Lives += gameplayDelta; Bombs += gameplayDelta; Power += gameplayDelta;
+            ScoreCandidate += gameplayDelta; Stage += gameplayDelta;
+            Difficulty += gameplayDelta; Character += gameplayDelta; Shot += gameplayDelta;
+            Practice += gameplayDelta; PracticeB5 += gameplayDelta; PracticeC4 += gameplayDelta;
+            PracticeUnlockBase += gameplayDelta;
+            Menu += menuDelta;
+            Mode += runtimeDelta; Cursor += runtimeDelta;
+            DefaultLives += runtimeDelta; DefaultBombs += runtimeDelta; C21DBB += runtimeDelta;
+            TimelinePrevious += runtimeDelta; TimelineCurrent += runtimeDelta;
+            MemoryDataSize = dataSize;
+            return "Steam 布局";
+        }
+    }
+
+    private static (int Rva, int VirtualSize) ReadDataSection(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var reader = new BinaryReader(stream);
+        if (reader.ReadUInt16() != 0x5A4D) throw new InvalidOperationException("目标文件不是有效的 Windows EXE。");
+        stream.Position = 0x3C;
+        var peOffset = reader.ReadInt32();
+        if (peOffset < 0 || peOffset > stream.Length - 24) throw new InvalidOperationException("EXE 的 PE 头位置无效。");
+        stream.Position = peOffset;
+        if (reader.ReadUInt32() != 0x00004550) throw new InvalidOperationException("EXE 的 PE 标记无效。");
+        stream.Position = peOffset + 6;
+        var sectionCount = reader.ReadUInt16();
+        stream.Position = peOffset + 20;
+        var optionalHeaderSize = reader.ReadUInt16();
+        var sectionTable = checked((long)peOffset + 24 + optionalHeaderSize);
+        for (var i = 0; i < sectionCount; i++)
+        {
+            stream.Position = sectionTable + i * 40L;
+            var name = Encoding.ASCII.GetString(reader.ReadBytes(8)).TrimEnd('\0');
+            var virtualSize = reader.ReadInt32();
+            var virtualAddress = reader.ReadInt32();
+            if (name == ".data") return (virtualAddress, virtualSize);
+        }
+        throw new InvalidOperationException("目标 EXE 不包含 .data 区段，无法定位游戏状态。");
     }
     private sealed record BossEntrance(int Stage, string BossName, int EventFrame, string Verification);
-    private sealed record EntranceFile(string TargetSha256, BossEntrance[] BossEntrances);
+    private sealed record EntranceFile(BossEntrance[] BossEntrances);
     private static readonly Lazy<IReadOnlyDictionary<int, BossEntrance>> BossEntrances = new(() =>
     {
         var path = Path.Combine(AppContext.BaseDirectory, "config", "entrances.json");
         var data = JsonSerializer.Deserialize<EntranceFile>(File.ReadAllText(path),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
             ?? throw new InvalidOperationException("入口配置文件为空。");
-        if (!string.Equals(data.TargetSha256, ExpectedHash, StringComparison.OrdinalIgnoreCase) ||
-            data.BossEntrances.Length != 7 ||
+        if (data.BossEntrances.Length != 7 ||
             data.BossEntrances.Any(e => e.Stage is < 1 or > 7 || e.EventFrame is < 1000 or > 20000 ||
                                          string.IsNullOrWhiteSpace(e.BossName)))
             throw new InvalidOperationException("入口配置文件不符合目标版本或格式约束。");
@@ -172,7 +223,7 @@ internal static class Program
         }
         void WarpToBoss()
         {
-            const int timerRva = Address.TimelinePrevious;
+            var timerRva = Address.TimelinePrevious;
             var address = checked(baseAddress + timerRva);
             Native.RequireWritable(handle, address, 8);
             for (int attempt = 1; attempt <= 100; attempt++)
@@ -336,9 +387,6 @@ internal static class Program
                 throw new InvalidOperationException($"找不到目标游戏：{expectedPath}");
 
             var fileHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(expectedPath)));
-            if (!string.Equals(fileHash, ExpectedHash, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException($"版本不匹配，拒绝附加。SHA-256：{fileHash}");
-
             var processes = Process.GetProcessesByName("th06nc");
             try
             {
@@ -353,10 +401,15 @@ internal static class Program
 
                 using var process = matches[0];
                 var module = process.MainModule ?? throw new InvalidOperationException("无法读取游戏主模块。");
-                var baseAddress = module.BaseAddress.ToInt64();
+                var moduleBase = module.BaseAddress.ToInt64();
                 var imageSize = module.ModuleMemorySize;
-                if (baseAddress <= 0 || imageSize < Address.Data + Address.MemoryDataSize)
+                var dataSection = ReadDataSection(expectedPath);
+                var layout = Address.Configure(dataSection.Rva, dataSection.VirtualSize);
+                if (moduleBase <= 0 || dataSection.Rva < 0 || dataSection.VirtualSize < Address.MemoryDataSize ||
+                    imageSize < dataSection.Rva + Address.MemoryDataSize)
                     throw new InvalidOperationException("模块基址或映像大小异常，停止读取。");
+                var baseAddress = checked(moduleBase + dataSection.Rva - Address.Data);
+                Console.WriteLine($"地址布局：{layout}；.data RVA=0x{dataSection.Rva:X}。");
 
                 using var handle = Native.Open(process.Id, set || scoreTest || monitorSet || monitorStart || monitorBossStage6 || monitorBoss || unlockCopy || unlockCurrent || warpTest || warpTestStage1 || genericWarpTest);
                 if (scoreTest)
@@ -418,7 +471,7 @@ internal static class Program
                     var targetFrame = BossEntrances.Value[expectedStage].EventFrame - 1;
                     if (state.Mode != 2 || state.Practice != 1 || state.Stage != expectedStage || state.Difficulty is < 0 or > 3)
                         throw new InvalidOperationException($"仅支持隔离副本常规难度 Stage {expectedStage} 游玩 / 暂停状态下的时间线测试。");
-                    const int timelinePreviousRva = Address.TimelinePrevious;
+                    var timelinePreviousRva = Address.TimelinePrevious;
                     var address = checked(baseAddress + timelinePreviousRva);
                     var previous = Native.ReadInt32(handle, address);
                     var current = Native.ReadInt32(handle, address + 4);
@@ -501,7 +554,7 @@ internal static class Program
                     var output = Path.Combine(folder, $"{args[1]}.bin");
                     if (File.Exists(output)) throw new InvalidOperationException($"快照已存在，不覆盖：{output}");
                     File.WriteAllBytes(output, buffer);
-                    Console.WriteLine($"只读内存快照：{output}（PID {process.Id}，.data RVA 0x{Address.Data:X}，{buffer.Length} 字节）");
+                    Console.WriteLine($"只读内存快照：{output}（PID {process.Id}，.data RVA 0x{dataSection.Rva:X}，{buffer.Length} 字节）");
                     return 0;
                 }
                 byte lives = Native.ReadByte(handle, checked(baseAddress + Address.Lives));
@@ -515,8 +568,8 @@ internal static class Program
                 if (probe)
                 {
                     var observedMode = ReadGameState(handle, baseAddress);
-                    Console.WriteLine($"菜单状态[0x50A0D0]={Native.ReadInt32(handle, baseAddress + 0x50A0D0)}，" +
-                        $"关卡光标[0xC07268]={Native.ReadInt32(handle, baseAddress + 0xC07268)}");
+                    Console.WriteLine($"菜单状态[0x{Address.Menu:X}]={Native.ReadInt32(handle, baseAddress + Address.Menu)}，" +
+                        $"关卡光标[0x{Address.Cursor:X}]={Native.ReadInt32(handle, baseAddress + Address.Cursor)}");
                     Console.WriteLine(observedMode.Mode == 2 && observedMode.Practice == 1
                         ? $"Practice 玩法：{observedMode.VariantName}。"
                         : "Practice 玩法：当前不在实际游玩状态，暂不判断。");

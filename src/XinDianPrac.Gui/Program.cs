@@ -27,7 +27,11 @@ internal static class Program
 
 internal sealed class MainForm : Form
 {
-    private const string ExpectedHash = "07850C8C6E469C0E82C13423E6D0D096A88D693455BDACACBB44C0AA3BCCE473";
+    private const int BaselineDataRva = 0x323000;
+    private int menuRva = 0x50A0D0;
+    private int modeRva = 0xC21D9C;
+    private int stageRva = 0x4F1E84;
+    private int cursorRva = 0xC07268;
     private readonly string workspace = ResolveWorkspace();
     private string? configuredGamePath;
     private readonly Label status = new();
@@ -58,8 +62,7 @@ internal sealed class MainForm : Form
     private DateTime practiceStageMenuSeenAt;
     private int practiceSelectedStageIndex = -1;
     private DateTime readyMenuSince;
-    private string? checkedHashPath;
-    private bool checkedHashValid;
+    private string? hashLoggedPath;
     private ReadySelection? pendingStart;
     private DateTime menuReturnSince;
     private (int Menu, int Mode, int Stage, int Cursor)? lastReadyState;
@@ -102,12 +105,12 @@ internal sealed class MainForm : Form
         var rootPrefix = gameRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         configuredGamePath = normalized.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase)
             ? Path.GetRelativePath(workspace, normalized) : normalized;
-        checkedHashPath = normalized;
-        checkedHashValid = true;
+        hashLoggedPath = normalized;
         Directory.CreateDirectory(Path.GetDirectoryName(GameTargetPath)!);
         File.WriteAllText(GameTargetPath, JsonSerializer.Serialize(new { gamePath = configuredGamePath }, new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
         if (gameMemory != 0) { CloseHandle(gameMemory); gameMemory = 0; }
-        WriteLog($"已选择游戏：{normalized}");
+        var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(normalized)));
+        WriteLog($"已选择游戏：{normalized}；SHA-256={hash}（仅记录，不限制版本）。");
         RefreshStatus();
     }
 
@@ -155,14 +158,12 @@ internal sealed class MainForm : Form
         if (gameMemory != 0) return;
         var target = GameExe;
         if (!File.Exists(target)) return;
-        if (!string.Equals(checkedHashPath, target, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(hashLoggedPath, target, StringComparison.OrdinalIgnoreCase))
         {
-            checkedHashPath = target;
+            hashLoggedPath = target;
             var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(target)));
-            checkedHashValid = hash.Equals(ExpectedHash, StringComparison.OrdinalIgnoreCase);
-            if (!checkedHashValid) WriteLog($"所选游戏版本不受支持，未连接。SHA-256：{hash}");
+            WriteLog($"目标游戏 SHA-256：{hash}（仅记录，不限制版本）。");
         }
-        if (!checkedHashValid) return;
         var processes = Process.GetProcessesByName("th06nc");
         try
         {
@@ -172,23 +173,69 @@ internal sealed class MainForm : Form
                 catch { return false; }
             }).ToArray();
             if (matches.Length != 1) return;
+            (int Rva, int VirtualSize) dataSection;
+            try { dataSection = ReadDataSection(target); }
+            catch (Exception ex)
+            {
+                WriteLog($"无法定位游戏 .data 区段：{ex.Message}");
+                return;
+            }
+            var module = matches[0].MainModule!;
+            var steamLayout = dataSection is { Rva: 0x36D000, VirtualSize: 0x908884 };
+            var oldLayout = dataSection is { Rva: 0x323000, VirtualSize: 0x906660 };
+            if ((!steamLayout && !oldLayout) || module.ModuleMemorySize < dataSection.Rva + dataSection.VirtualSize)
+            {
+                WriteLog($"尚未定位此游戏的内存布局，无法读取菜单状态；.data RVA=0x{dataSection.Rva:X}，大小=0x{dataSection.VirtualSize:X}。");
+                return;
+            }
+            menuRva = 0x50A0D0 + (steamLayout ? 0xFA0 : 0);
+            modeRva = 0xC21D9C + (steamLayout ? 0x2220 : 0);
+            stageRva = 0x4F1E84 + (steamLayout ? 0xC50 : 0);
+            cursorRva = 0xC07268 + (steamLayout ? 0x2220 : 0);
             gamePid = matches[0].Id;
-            gameBase = matches[0].MainModule!.BaseAddress;
+            gameBase = module.BaseAddress + dataSection.Rva - BaselineDataRva;
             gameMemory = OpenProcess(0x1010, false, gamePid);
             if (gameMemory == 0) WriteLog("无法读取游戏菜单状态；请检查控制器权限。");
-            else WriteLog($"已连接关卡确认监视：PID {gamePid}。");
+            else WriteLog($"已连接关卡确认监视：PID {gamePid}；{(steamLayout ? "Steam" : "旧版")}布局；" +
+                $"菜单={ReadGameInt(menuRva)}、模式={ReadGameInt(modeRva)}、关卡={ReadGameInt(stageRva)}、光标={ReadGameInt(cursorRva)}。");
         }
         finally { foreach (var process in processes) process.Dispose(); }
+    }
+
+    private static (int Rva, int VirtualSize) ReadDataSection(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var reader = new BinaryReader(stream);
+        if (reader.ReadUInt16() != 0x5A4D) throw new InvalidOperationException("目标文件不是有效的 Windows EXE。");
+        stream.Position = 0x3C;
+        var peOffset = reader.ReadInt32();
+        if (peOffset < 0 || peOffset > stream.Length - 24) throw new InvalidOperationException("EXE 的 PE 头位置无效。");
+        stream.Position = peOffset;
+        if (reader.ReadUInt32() != 0x00004550) throw new InvalidOperationException("EXE 的 PE 标记无效。");
+        stream.Position = peOffset + 6;
+        var sectionCount = reader.ReadUInt16();
+        stream.Position = peOffset + 20;
+        var optionalHeaderSize = reader.ReadUInt16();
+        var sectionTable = checked((long)peOffset + 24 + optionalHeaderSize);
+        for (var i = 0; i < sectionCount; i++)
+        {
+            stream.Position = sectionTable + i * 40L;
+            var name = Encoding.ASCII.GetString(reader.ReadBytes(8)).TrimEnd('\0');
+            var virtualSize = reader.ReadInt32();
+            var virtualAddress = reader.ReadInt32();
+            if (name == ".data") return (virtualAddress, virtualSize);
+        }
+        throw new InvalidOperationException("目标 EXE 不包含 .data 区段，无法定位游戏状态。");
     }
 
     private void ReadyTick()
     {
         if (gameMemory == 0) AttachReadyWatcher();
         if (gameMemory == 0) return;
-        var menu = ReadGameInt(0x50A0D0);
-        var mode = ReadGameInt(0xC21D9C);
-        var stageIndex = ReadGameInt(0x4F1E84);
-        var cursor = ReadGameInt(0xC07268);
+        var menu = ReadGameInt(menuRva);
+        var mode = ReadGameInt(modeRva);
+        var stageIndex = ReadGameInt(stageRva);
+        var cursor = ReadGameInt(cursorRva);
         var readyState = (Menu: menu, Mode: mode, Stage: stageIndex, Cursor: cursor);
         var stateChanged = readyState != lastReadyState;
         if (stateChanged)
@@ -204,7 +251,7 @@ internal sealed class MainForm : Form
             practiceSelectedStageIndex = -1; readyMenuSince = default; pendingStart = null;
             return;
         }
-        if (pendingStart is { } selected && mode == 2 && ReadGameInt(0x4F1E84) == selected.Stage)
+        if (pendingStart is { } selected && mode == 2 && ReadGameInt(stageRva) == selected.Stage)
         {
             pendingStart = null;
             StartMonitoring(selected);
@@ -459,7 +506,7 @@ internal sealed class MainForm : Form
         dialog.AcceptButton = confirm; dialog.CancelButton = cancel;
         WriteLog($"检测到 Stage {selectedStage} 的游戏内准备画面，等待确认开局设置。");
         var result = dialog.ShowDialog(this);
-        if (result == DialogResult.OK && ReadGameInt(0x50A0D0) == 10)
+        if (result == DialogResult.OK && ReadGameInt(menuRva) == 10)
         {
             score.Value = scoreInput.Value; lives.Value = livesInput.Value;
             bombs.Value = bombsInput.Value; power.Value = powerInput.Value;
@@ -513,8 +560,7 @@ internal sealed class MainForm : Form
                 }
             }
             var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(GameExe)));
-            if (!hash.Equals(ExpectedHash, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException($"游戏版本不匹配，拒绝启动。SHA-256：{hash}");
+            WriteLog($"启动目标 SHA-256：{hash}（不进行版本拦截）。");
             using var process = Process.GetProcessesByName("th06nc").FirstOrDefault(p =>
             {
                 try { return string.Equals(p.MainModule?.FileName, GameExe, StringComparison.OrdinalIgnoreCase); }
@@ -537,8 +583,7 @@ internal sealed class MainForm : Form
             try
             {
                 var path = process.MainModule?.FileName;
-                if (!string.IsNullOrWhiteSpace(path) && File.Exists(path) &&
-                    Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).Equals(ExpectedHash, StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
                     candidates.Add(Path.GetFullPath(path));
             }
             catch { }
@@ -546,7 +591,7 @@ internal sealed class MainForm : Form
         }
         var unique = candidates.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         if (unique.Length == 1) { SaveGameTarget(unique[0]); return true; }
-        if (unique.Length > 1) WriteLog("发现多个兼容游戏路径，请用“选择游戏程序”指定要连接的 th06nc.exe。");
+        if (unique.Length > 1) WriteLog("发现多个 th06nc.exe 进程，请用“选择游戏程序”指定要连接的游戏。");
         return false;
     }
 
@@ -564,10 +609,7 @@ internal sealed class MainForm : Form
         if (File.Exists(candidate)) dialog.InitialDirectory = Path.GetDirectoryName(candidate);
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
-            var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(dialog.FileName)));
-            if (!hash.Equals(ExpectedHash, StringComparison.OrdinalIgnoreCase))
-                ShowError($"所选 th06nc.exe 版本不受支持，未连接。SHA-256：{hash}");
-            else SaveGameTarget(dialog.FileName);
+            SaveGameTarget(dialog.FileName);
         }
     }
 

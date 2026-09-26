@@ -1,5 +1,4 @@
 {
-  "targetSha256": "07850C8C6E469C0E82C13423E6D0D096A88D693455BDACACBB44C0AA3BCCE473",
   "bossEntrances": [
     { "stage": 1, "bossName": "露米娅", "eventFrame": 5092, "verification": "Normal 灵梦 A 登场；Hard 魔理沙 B 战斗及重开已实测" },
     { "stage": 2, "bossName": "琪露诺", "eventFrame": 5893, "verification": "Normal 灵梦 A：登场对话已实测" },
